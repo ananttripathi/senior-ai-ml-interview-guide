@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.interviewnode.com)",
+      "WebFetch(domain:www.yuan-meng.com)",
+      "WebFetch(domain:huyenchip.com)",
+      "WebFetch(domain:www.tryexponent.com)",
+      "WebFetch(domain:www.datainterview.com)",
+      "WebFetch(domain:artgor.medium.com)",
+      "WebFetch(domain:mimansajaiswal.github.io)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(git push:*)"
+    ]
+  }
+}
