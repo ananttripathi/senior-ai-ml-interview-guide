@@ -2,6 +2,8 @@
 
 SQL is tested at every MAANG company for Data Scientist roles and most ML Engineer roles. Expect 1–2 SQL problems per interview at Meta, Google, and Amazon DS.
 
+> **This file covers patterns and templates. For 29 full interview questions (both coding round and product analytics round) with company tags and complete solutions, see [sql-interview-questions.md](sql-interview-questions.md).**
+
 ---
 
 ## What They're Testing
@@ -300,16 +302,112 @@ SELECT user_id, COUNT(*) FROM orders GROUP BY user_id HAVING COUNT(*) > 5;
 
 ---
 
+## Additional Pattern: Islands and Gaps
+
+The most advanced window function pattern. Used when you need to find consecutive runs of a state.
+
+**"Find periods of consecutive days with > 1000 active users."**
+
+```sql
+-- Key trick: row_number() - row_number() partitioned by state = constant within a run
+WITH daily_active AS (
+    SELECT DATE(event_time) AS dt,
+           COUNT(DISTINCT user_id) AS dau
+    FROM events
+    GROUP BY 1
+),
+flagged AS (
+    SELECT dt, dau,
+           CASE WHEN dau >= 1000 THEN 1 ELSE 0 END AS high_day
+    FROM daily_active
+),
+grouped AS (
+    SELECT dt, dau,
+           -- Global row number minus group-specific row number = constant per run
+           ROW_NUMBER() OVER (ORDER BY dt) -
+           ROW_NUMBER() OVER (PARTITION BY high_day ORDER BY dt) AS island_id,
+           high_day
+    FROM flagged
+    WHERE high_day = 1
+)
+SELECT
+    MIN(dt) AS period_start,
+    MAX(dt) AS period_end,
+    COUNT(*) AS consecutive_days,
+    MIN(dau) AS min_dau,
+    MAX(dau) AS max_dau
+FROM grouped
+GROUP BY island_id
+HAVING COUNT(*) >= 3          -- only periods of 3+ days
+ORDER BY period_start;
+```
+
+## Additional Pattern: Pivoting Rows to Columns
+
+**"Show total revenue by product category, as separate columns per quarter."**
+
+```sql
+SELECT
+    product_category,
+    SUM(CASE WHEN EXTRACT(QUARTER FROM order_date) = 1 THEN revenue ELSE 0 END) AS Q1,
+    SUM(CASE WHEN EXTRACT(QUARTER FROM order_date) = 2 THEN revenue ELSE 0 END) AS Q2,
+    SUM(CASE WHEN EXTRACT(QUARTER FROM order_date) = 3 THEN revenue ELSE 0 END) AS Q3,
+    SUM(CASE WHEN EXTRACT(QUARTER FROM order_date) = 4 THEN revenue ELSE 0 END) AS Q4
+FROM orders
+WHERE EXTRACT(YEAR FROM order_date) = 2024
+GROUP BY product_category
+ORDER BY product_category;
+```
+
+## Additional Pattern: Recursive CTEs (Hierarchy)
+
+**"Find all employees under a given manager (multi-level org chart)."**
+
+```sql
+-- Table: employees(employee_id, name, manager_id)
+WITH RECURSIVE org_chart AS (
+    -- Base case: the root manager
+    SELECT employee_id, name, manager_id, 0 AS depth
+    FROM employees
+    WHERE employee_id = 42  -- root manager ID
+
+    UNION ALL
+
+    -- Recursive case: direct reports of current level
+    SELECT e.employee_id, e.name, e.manager_id, oc.depth + 1
+    FROM employees e
+    JOIN org_chart oc ON e.manager_id = oc.employee_id
+)
+SELECT employee_id, name, depth
+FROM org_chart
+ORDER BY depth, name;
+```
+
+---
+
 ## Practice Problems
 
+### Coding round (timed, 20–30 min each)
 1. Calculate 7-day rolling retention for each user cohort
 2. Find pairs of users who both visited the site on the same day
 3. Calculate the median order value per customer segment (tricky — SQL doesn't have MEDIAN in all dialects)
 4. Find users who have increased their purchase frequency month-over-month for 3 consecutive months
-5. Given a table of A/B experiment assignments and a conversions table, calculate statistical significance of the experiment result in SQL
+5. Given a table of A/B experiment assignments and a conversions table, calculate CTR per variant and check for Sample Ratio Mismatch
+6. Find all "power users" — users in the top 10% by session count who also have above-average order value
+7. Compute the longest streak of consecutive days any user was active (islands and gaps)
 
-Platforms:
-- **StrataScratch** — real interview questions from MAANG
-- **Mode Analytics SQL Tutorial** — good for window functions
-- **LeetCode SQL section** — 50+ database problems
+### Product analytics round (open-ended)
+8. "A new feature launched last week. Write queries to evaluate its impact."
+9. "DAU dropped 15% on mobile. Walk me through how you'd investigate using SQL."
+10. "Design and query a metric for creator health on a video platform."
+
+See [sql-interview-questions.md](sql-interview-questions.md) for full solutions to all of these.
+
+---
+
+## Platforms
+- **StrataScratch** — real interview questions from MAANG, company filter
+- **DataLemur** — modern product analytics questions, strong Meta/Google coverage
+- **LeetCode SQL section** — 200+ database problems (LeetCode 176–2990 range)
 - **HackerRank SQL** — structured difficulty progression
+- **Mode Analytics SQL Tutorial** — best free resource for window functions
